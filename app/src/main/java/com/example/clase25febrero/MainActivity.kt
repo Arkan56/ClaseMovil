@@ -62,6 +62,10 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener,
             }
         }
 
+        binding.button5.setOnClickListener {
+            startActivity(Intent(this, MapsActivity::class.java))
+        }
+
         //Leer contactos
         val mProjection = arrayOf(ContactsContract.Profile._ID, ContactsContract.Profile.DISPLAY_NAME_PRIMARY)
         mContactsAdapter = ContactsAdapter(this, null, 0)
