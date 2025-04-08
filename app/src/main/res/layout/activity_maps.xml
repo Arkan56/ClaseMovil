@@ -21,6 +21,7 @@
         android:layout_height="wrap_content"
         android:ems="10"
         android:inputType="text"
+        android:imeOptions="actionSend"
         android:text=""
         android:hint="Dirección o lugar"
         android:padding="16dp"

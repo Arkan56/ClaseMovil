@@ -14,6 +14,11 @@ class MIscelanius {
         const val PERMISSION_UBI = 30
         const val RADIUS_OF_EARTH_KM = 6378
 
+        const val lowerLeftLatitude = 1.396967
+        const val lowerLeftLongitude = -78.903968
+        const val upperRightLatitude = 11.983639
+        const val upperRightLongitude = -71.869905
+
         fun loadJSONFromAsset(context: Context, fileName: String): String? {
             var json: String? = null
             try {

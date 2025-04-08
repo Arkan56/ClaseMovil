@@ -63,7 +63,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener,
         }
 
         binding.button5.setOnClickListener {
-            startActivity(Intent(this, MapsActivity::class.java))
+            startActivity(Intent(this, OSMActivity::class.java))
         }
 
         //Leer contactos

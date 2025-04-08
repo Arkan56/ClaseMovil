@@ -11,10 +11,15 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.location.Address
+import android.location.Geocoder
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.provider.ContactsContract
 import android.util.Log
+import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -35,6 +40,7 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.MapStyleOptions
+import java.io.IOException
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -47,7 +53,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     //callback a localizacion
     private lateinit var mLocationCallback: LocationCallback
 
-    private lateinit var mMap: GoogleMap
+    private  var mMap: GoogleMap?=null
     private lateinit var binding: ActivityMapsBinding
     var gpsub = LatLng(4.628721, -74.0636458129701)
 
@@ -55,6 +61,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var sensorManager: SensorManager
     private lateinit var lightSensor: Sensor
     private lateinit var lightSensorListener: SensorEventListener
+
+    //Inicializar el Geocoder
+    private lateinit var mGeocoder: Geocoder
 
     override fun onResume() {
         super.onResume()
@@ -76,6 +85,60 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
+
+        //Inicializar Sensor
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)!!
+
+        lightSensorListener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                if (mMap != null) {
+                    if (event.values[0] < 10000) { //Este es el lumbral de luz
+                        Log.i("MAPS", "DARK MAP " + event.values[0])
+                        mMap?.setMapStyle(MapStyleOptions.loadRawResourceStyle(baseContext, R.raw.noche))
+                    } else {
+                        Log.i("MAPS", "LIGHT MAP " + event.values[0])
+                        mMap?.setMapStyle(MapStyleOptions.loadRawResourceStyle(baseContext, R.raw.retro))
+                    }
+                }
+            }
+            override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
+        }
+
+        //Geocoder
+        mGeocoder = Geocoder(baseContext)
+        binding.editTextText.setOnEditorActionListener { v, actionId, event ->
+            if(actionId == EditorInfo.IME_ACTION_SEND){
+                val mGeocoder = Geocoder(baseContext)
+                //Cuando se realice la busqueda
+                val addressString = binding.editTextText.text.toString()
+                if (addressString.isNotEmpty()) {
+                    try {
+                        val addresses: List<Address>? = mGeocoder.getFromLocationName(
+                            addressString, 2, MIscelanius.lowerLeftLatitude, MIscelanius.lowerLeftLongitude,
+                            MIscelanius.upperRightLatitude, MIscelanius.upperRightLongitude)
+                        if (addresses != null && addresses.isNotEmpty()) {
+                            val addressResult = addresses[0]
+                            val position = LatLng(addressResult.latitude, addressResult.longitude)
+                            if (mMap != null) {
+                                //Agregar Marcador al mapa
+                                mMap?.addMarker(MarkerOptions().position(position).title(addressResult.featureName))
+                                Toast.makeText(this, "Latitud" + position.latitude + "Longitud" + position.longitude,
+                                    Toast.LENGTH_LONG).show()
+                            } else {
+                                Toast.makeText(this, "Dirección no encontrada", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    } catch (e: IOException) {
+                        e.printStackTrace()
+                    }
+                } else {
+                    Toast.makeText(this, "La dirección esta vacía", Toast.LENGTH_SHORT).show()
+                }
+            }
+            return@setOnEditorActionListener true
+        }
+
     }
 
     /**
@@ -89,33 +152,39 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
      */
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
-        mMap.uiSettings.isZoomGesturesEnabled = true
-        mMap.uiSettings.isZoomControlsEnabled = true
-        mMap.setMapStyle(MapStyleOptions.loadRawResourceStyle(this, R.raw.noche)) //Cambiar el estilo del mapa
+        mMap!!.uiSettings.isZoomGesturesEnabled = true
+        mMap!!.uiSettings.isZoomControlsEnabled = true
+        mMap!!.setMapStyle(MapStyleOptions.loadRawResourceStyle(this, R.raw.noche)) //Cambiar el estilo del mapa
+        mMap!!.setOnMapClickListener { latLng ->
+            try {
+                val addresses = mGeocoder.getFromLocation(latLng.latitude, latLng.longitude, 1)
+                if (addresses != null && addresses.isNotEmpty()) {
+                    val address = addresses[0]
+                    val addressLine = address.getAddressLine(0) // Dirección completa
+
+                    mMap?.addMarker(
+                        MarkerOptions()
+                            .position(latLng)
+                            .title(addressLine)
+                    )
+                } else {
+                    // Si no encuentra dirección
+                    mMap?.addMarker(
+                        MarkerOptions()
+                            .position(latLng)
+                            .title("Ubicación sin dirección")
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(this, "Error al obtener dirección", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
 
         //Metodo propio
         mLocationRequest = createLocationRequest()
-
-        //Inicializar Sensor
-        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)!!
-
-        lightSensorListener = object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent) {
-                if (mMap != null) {
-                    if (event.values[0] < 10000) { //Este es el lumbral de luz
-                        Log.i("MAPS", "DARK MAP " + event.values[0])
-                        mMap.setMapStyle(MapStyleOptions.loadRawResourceStyle(baseContext, R.raw.noche))
-                    } else {
-                        Log.i("MAPS", "LIGHT MAP " + event.values[0])
-                        mMap.setMapStyle(MapStyleOptions.loadRawResourceStyle(baseContext, R.raw.retro))
-                    }
-                }
-            }
-            override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
-        }
 
 
         // Add a marker in Sydney and move the camera
@@ -134,7 +203,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                         Log.i("LOCATION", "Location update in the callback: $location")
                         if (location != null) {
                             gpsub = LatLng(location.latitude,location.longitude)
-                            val gps = mMap.addMarker(MarkerOptions().position(gpsub).title("Ubicacion actual"))
+                            val gps = mMap?.addMarker(MarkerOptions().position(gpsub).title("Ubicacion actual"))
                             //.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)))
                         }
                     }
@@ -152,17 +221,17 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
 
-        val mrkJaveriana = mMap.addMarker(MarkerOptions().position(javeriana).title("Universidad Javeriana").snippet("La segunda mejor universidad privada").alpha(1F)
+        val mrkJaveriana = mMap?.addMarker(MarkerOptions().position(javeriana).title("Universidad Javeriana").snippet("La segunda mejor universidad privada").alpha(1F)
             //.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE))
             .icon(bitmapDescriptorFromVector(this, R.drawable.baseline_book_24)))
-        val mrkPlazaBolivar = mMap.addMarker(MarkerOptions().position(plazaBolivar).title("Plaza de Bolivar"))
+        val mrkPlazaBolivar = mMap?.addMarker(MarkerOptions().position(plazaBolivar).title("Plaza de Bolivar"))
             //.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)))
-        val mrkTitan = mMap.addMarker(MarkerOptions().position(titan).title("C.C TItan"))
+        val mrkTitan = mMap?.addMarker(MarkerOptions().position(titan).title("C.C TItan"))
             //.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)))
-        val mrkMovistar = mMap.addMarker(MarkerOptions().position(movistar).title("Movistar Arena"))
+        val mrkMovistar = mMap?.addMarker(MarkerOptions().position(movistar).title("Movistar Arena"))
             //.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)))
-        mMap.moveCamera(CameraUpdateFactory.zoomTo(15F))
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(gpsub))
+        mMap?.moveCamera(CameraUpdateFactory.zoomTo(15F))
+        mMap?.moveCamera(CameraUpdateFactory.newLatLng(gpsub))
 
         mrkJaveriana?.isVisible = true //Mostrar un marcador
     }
@@ -216,7 +285,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                             Log.i("LOCATION", "Location update in the callback: $location")
                             if (location != null) {
                                 gpsub = LatLng(location.latitude,location.longitude)
-                                val gps = mMap.addMarker(MarkerOptions().position(gpsub).title("Ubicacion actual"))
+                                val gps = mMap!!.addMarker(MarkerOptions().position(gpsub).title("Ubicacion actual"))
                                 //.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)))
                             }
                         }

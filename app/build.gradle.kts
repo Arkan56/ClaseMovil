@@ -1,7 +1,10 @@
+import org.gradle.kotlin.dsl.implementation
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.google.android.libraries.mapsplatform.secrets.gradle.plugin)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -49,6 +52,12 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    //GoogleMaps
     implementation(libs.play.services.location)
     implementation (libs.play.services.maps.v1802)
+    //OSM
+    implementation (libs.osmdroid.android.v6114)
+    //Firebase
+    implementation(libs.firebase.bom)
+    implementation(libs.firebase.ui.auth)
 }
