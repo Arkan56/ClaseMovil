@@ -6,32 +6,40 @@ import android.content.pm.PackageManager
 import android.database.Cursor
 import android.os.Bundle
 import android.provider.ContactsContract
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.Toast
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import com.example.clase25febrero.databinding.ActivityMainBinding
-import org.json.JSONObject
+import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener,
     AdapterView.OnItemSelectedListener {
     lateinit var binding: ActivityMainBinding
     var item = "0"
-
     var mProjection: Array<String>? = null
     var mCursor: Cursor? = null
     var mContactsAdapter: ContactsAdapter? = null
+    private lateinit var auth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        val userEmail = intent.getStringExtra("user")
+
+        // Usarlo como necesites
+        if (userEmail != null) {
+            Toast.makeText(this, "Bienvenido $userEmail", Toast.LENGTH_SHORT).show()
+            // o por ejemplo:
+            // findViewById<TextView>(R.id.textViewUsuario).text = userEmail
+        }
 
         /*
         binding.spinner.onItemSelectedListener = this
@@ -93,6 +101,30 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemClickListener,
                     "", MIscelanius.PERMISSION_READ_CONTACTS)
             }
         }
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        // Handle item selection
+        return when (item.itemId) {
+            R.id.logout -> {
+                auth.signOut()
+                val intent = Intent(this, SingIn::class.java)
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                startActivity(intent)
+                true
+            }
+            R.id.settings -> {
+                //Abrir actividad para configuración etc
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        val inflater: MenuInflater = menuInflater
+        inflater.inflate(R.menu.menu, menu)
+        return true
     }
 
     private fun pedirPermiso(context: Activity, permiso: String, justificacion: String, idCode: Int){
